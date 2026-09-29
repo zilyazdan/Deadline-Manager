@@ -8,7 +8,6 @@ from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle, Line, RoundedRectangle
 from kivy.metrics import dp
-from kivy.properties import BooleanProperty
 from kivy.uix.widget import Widget
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.boxlayout import BoxLayout
@@ -27,31 +26,29 @@ Window.size = (900, 600)
 Window.clearcolor = (0, 0, 0, 1)
 
 
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-
 if getattr(__import__("sys"), "frozen", False):
-    DATA_PATH = os.path.join(
+    DATA_FOLDER = os.path.join(
         os.path.expanduser("~"),
         "LifeSystemManager"
     )
-    os.makedirs(DATA_PATH, exist_ok=True)
 else:
-    DATA_PATH = BASE_PATH
+    DATA_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
-SAVE_PATH = os.path.join(
-    DATA_PATH,
-    "deadlines.json"
-)
+os.makedirs(DATA_FOLDER, exist_ok=True)
 
-SOUND_PATH = os.path.join(
-    BASE_PATH,
-    "Alarm Sound Effect.mp3"
-)
+DATA_PATH = os.path.join(DATA_FOLDER, "deadlines.json")
 
-ICON_PATH = os.path.join(
-    BASE_PATH,
-    "Icon.png"
-)
+
+def resource_path(filename):
+    import sys
+
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, filename)
+
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        filename
+    )
 
 
 class StripeCounter(Widget):
@@ -61,6 +58,7 @@ class StripeCounter(Widget):
 
         with self.canvas:
             Color(0.067, 0.067, 0.067, 1)
+
             self.background = Rectangle(
                 pos=self.pos,
                 size=self.size
@@ -70,20 +68,13 @@ class StripeCounter(Widget):
 
             self.lines = []
 
-            for x in range(-100, 700, 25):
+            for _ in range(40):
                 line = Line(
-                    points=[
-                        self.x + x,
-                        self.y,
-                        self.x + x + 100,
-                        self.y + 100
-                    ],
-                    width=1.5
+                    width=2
                 )
-
                 self.lines.append(line)
 
-            Color(0.25, 0.25, 0.25, 1)
+            Color(0.20, 0.20, 0.20, 1)
 
             self.border = Line(
                 rectangle=(
@@ -96,25 +87,52 @@ class StripeCounter(Widget):
             )
 
         self.bind(
-            pos=self.update_graphics,
-            size=self.update_graphics
+            pos=self.update_counter,
+            size=self.update_counter
         )
 
-    def update_graphics(self, *args):
+        self.update_counter()
+
+    def update_counter(self, *args):
 
         self.background.pos = self.pos
         self.background.size = self.size
 
+        width = self.width
+        height = self.height
+
         for index, line in enumerate(self.lines):
 
-            x = -100 + index * 25
+            start = -height + index * 25
 
-            line.points = [
-                self.x + x,
-                self.y,
-                self.x + x + 100,
-                self.y + 100
-            ]
+            x1 = start
+            y1 = 0
+
+            x2 = start + height
+            y2 = height
+
+            if x1 < 0:
+                y1 = -x1
+                x1 = 0
+
+            if x2 > width:
+                y2 = height - (x2 - width)
+                x2 = width
+
+            if (
+                x1 < width
+                and x2 > 0
+                and y1 <= height
+                and y2 >= 0
+            ):
+                line.points = [
+                    self.x + x1,
+                    self.y + y1,
+                    self.x + x2,
+                    self.y + y2
+                ]
+            else:
+                line.points = []
 
         self.border.rectangle = (
             self.x,
@@ -126,8 +144,6 @@ class StripeCounter(Widget):
 
 class DeadlineCard(FloatLayout):
 
-    expanded = BooleanProperty(False)
-
     def __init__(
         self,
         manager,
@@ -138,30 +154,21 @@ class DeadlineCard(FloatLayout):
 
         self.manager = manager
         self.deadline = deadline
+        self.expanded = False
 
         self.size_hint_y = None
-        self.height = dp(185)
+        self.height = dp(190)
 
-        with self.canvas.before:
-            Color(
-                0.09,
-                0.09,
-                0.09,
-                1
-            )
+        with self.canvas:
+            Color(0.055, 0.055, 0.055, 1)
 
             self.background = RoundedRectangle(
                 pos=self.pos,
                 size=self.size,
-                radius=[dp(8)]
+                radius=[dp(12)]
             )
 
-            Color(
-                0.20,
-                0.20,
-                0.20,
-                1
-            )
+            Color(0.18, 0.18, 0.18, 1)
 
             self.border = Line(
                 rounded_rectangle=(
@@ -169,7 +176,7 @@ class DeadlineCard(FloatLayout):
                     self.y,
                     self.width,
                     self.height,
-                    dp(8)
+                    dp(12)
                 ),
                 width=1
             )
@@ -181,112 +188,109 @@ class DeadlineCard(FloatLayout):
 
         self.name_label = Label(
             text=deadline.get("name", ""),
-            font_size=dp(17),
-            bold=True,
             color=(1, 1, 1, 1),
-            halign="left",
-            valign="middle",
+            font_size=dp(21),
+            bold=True,
             size_hint=(1, None),
-            height=dp(38),
+            height=dp(40),
             pos_hint={
                 "x": 0,
-                "top": 1
+                "top": 0.94
             },
-            padding=(dp(15), 0)
+            halign="center",
+            valign="middle"
         )
 
+        self.name_label.bind(
+            size=lambda instance, value:
+            setattr(instance, "text_size", value)
+        )
+
+        self.add_widget(self.name_label)
+
         self.date_label = Label(
-            text=f"Date: {deadline.get('date', '')}",
-            font_size=dp(13),
-            color=(0.67, 0.67, 0.67, 1),
-            halign="left",
-            valign="middle",
+            text=self.get_date_text(),
+            color=(0.75, 0.75, 0.75, 1),
+            font_size=dp(17),
             size_hint=(1, None),
-            height=dp(28),
+            height=dp(30),
             pos_hint={
                 "x": 0,
-                "top": 0.78
+                "top": 0.73
             },
-            padding=(dp(15), 0)
+            halign="center",
+            valign="middle"
         )
+
+        self.date_label.bind(
+            size=lambda instance, value:
+            setattr(instance, "text_size", value)
+        )
+
+        self.add_widget(self.date_label)
 
         self.status_label = Label(
             text="",
-            font_size=dp(13),
-            bold=True,
-            color=(0, 1, 0, 1),
-            halign="left",
-            valign="middle",
-            text_size=(None, None),
+            color=(1, 1, 1, 1),
+            font_size=dp(15),
             size_hint=(1, None),
-            height=dp(58),
+            height=dp(48),
             pos_hint={
                 "x": 0,
-                "top": 0.63
+                "top": 0.55
             },
-            padding=(dp(15), 0)
+            halign="center",
+            valign="middle"
         )
 
+        self.status_label.bind(
+            size=lambda instance, value:
+            setattr(instance, "text_size", value)
+        )
+
+        self.add_widget(self.status_label)
+
         self.pin_button = Button(
-            text="",
-            font_size=dp(12),
-            bold=True,
-            color=(1, 1, 1, 1),
-            size_hint=(1, None),
-            height=dp(38),
+            text="UNPIN" if deadline.get("pinned", False) else "PIN",
+            font_size=dp(15),
+            size_hint=(None, None),
+            size=(dp(500), dp(38)),
             pos_hint={
-                "x": 0,
-                "y": 0
+                "center_x": 0.5,
+                "y": dp(10)
             },
             background_normal="",
-            background_down="",
-            border=(0, 0, 0, 0)
+            background_color=(0.12, 0.12, 0.12, 1),
+            color=(1, 1, 1, 1)
         )
 
         self.pin_button.bind(
-            on_release=self.pin_pressed
+            on_release=self.toggle_pin
         )
 
+        self.add_widget(self.pin_button)
+
         self.delete_button = Button(
-            text="DELETE DEADLINE",
-            font_size=dp(12),
-            bold=True,
-            color=(1, 1, 1, 1),
-            size_hint=(1, None),
-            height=dp(38),
+            text="DELETE",
+            font_size=dp(15),
+            size_hint=(None, None),
+            size=(dp(500), dp(38)),
             pos_hint={
-                "x": 0,
-                "y": 0
+                "center_x": 0.5,
+                "y": dp(10)
             },
             background_normal="",
-            background_down="",
-            border=(0, 0, 0, 0)
+            background_color=(0.55, 0.05, 0.05, 1),
+            color=(1, 1, 1, 1),
+            opacity=0,
+            disabled=True
         )
 
         self.delete_button.bind(
-            on_release=self.delete_pressed
+            on_release=self.delete_deadline
         )
 
-        self.add_widget(
-            self.name_label
-        )
-
-        self.add_widget(
-            self.date_label
-        )
-
-        self.add_widget(
-            self.status_label
-        )
-
-        self.add_widget(
-            self.pin_button
-        )
-
-        self.refresh_visuals()
-
-        self.delete_button.opacity = 0
-        self.delete_button.disabled = True
+        self.add_widget(self.delete_button)
 
         self.update_status()
 
@@ -300,192 +304,145 @@ class DeadlineCard(FloatLayout):
             self.y,
             self.width,
             self.height,
-            dp(8)
+            dp(12)
         )
+
+    def get_date_text(self):
+
+        try:
+            d = date(
+                int(self.deadline["year"]),
+                int(self.deadline["month"]),
+                int(self.deadline["day"])
+            )
+
+            return d.strftime("%d/%m/%Y")
+
+        except:
+            return ""
+
+    def toggle_pin(self, instance):
+
+        self.deadline["pinned"] = not self.deadline.get(
+            "pinned",
+            False
+        )
+
+        self.manager.save_deadlines()
+
+        self.manager.refresh_deadlines()
+
+    def delete_deadline(self, instance):
+
+        if self.deadline in self.manager.deadlines:
+
+            self.manager.deadlines.remove(
+                self.deadline
+            )
+
+            self.manager.save_deadlines()
+
+            self.manager.refresh_deadlines()
+
+    def show_delete(self):
+
+        self.expanded = True
+
+        self.height = dp(230)
+
+        self.delete_button.opacity = 1
+        self.delete_button.disabled = False
+
+        self.pin_button.opacity = 0
+        self.pin_button.disabled = True
+
+    def hide_delete(self):
+
+        self.expanded = False
+
+        self.height = dp(190)
+
+        self.delete_button.opacity = 0
+        self.delete_button.disabled = True
+
+        self.pin_button.opacity = 1
+        self.pin_button.disabled = False
 
     def on_touch_down(self, touch):
 
         if not self.collide_point(
             *touch.pos
         ):
-            return super().on_touch_down(touch)
+            return False
 
-        if (
-            touch.pos[1]
-            >= self.y
-            and touch.pos[1]
-            <= self.y + dp(38)
+        if self.delete_button.collide_point(
+            *touch.pos
         ):
             return super().on_touch_down(touch)
 
-        if (
-            touch.pos[1]
-            >= self.y + dp(38)
-            and touch.pos[1]
-            <= self.top
+        if self.pin_button.collide_point(
+            *touch.pos
         ):
-            self.toggle_delete()
-
-            return True
-
-        return super().on_touch_down(touch)
-
-    def toggle_delete(self):
-
-        self.expanded = not self.expanded
+            return super().on_touch_down(touch)
 
         if self.expanded:
-
-            self.height = dp(230)
-
-            self.delete_button.pos_hint = {
-                "x": 0,
-                "y": 0
-            }
-
-            self.delete_button.opacity = 1
-            self.delete_button.disabled = False
-
-            self.pin_button.pos_hint = {
-                "x": 0,
-                "y": dp(42)
-            }
-
+            self.hide_delete()
         else:
+            self.show_delete()
 
-            self.height = dp(185)
-
-            self.delete_button.opacity = 0
-            self.delete_button.disabled = True
-
-            self.pin_button.pos_hint = {
-                "x": 0,
-                "y": 0
-            }
-
-    def pin_pressed(self, instance):
-
-        self.manager.toggle_pin(
-            self.deadline
-        )
-
-    def delete_pressed(self, instance):
-
-        self.manager.delete_deadline(
-            self.deadline
-        )
-
-    def refresh_visuals(self):
-
-        if self.deadline.get(
-            "pinned",
-            False
-        ):
-
-            self.pin_button.text = "UNPIN"
-            self.pin_button.background_color = (
-                0.50,
-                0.38,
-                0,
-                1
-            )
-
-        else:
-
-            self.pin_button.text = "PIN"
-            self.pin_button.background_color = (
-                0.20,
-                0.20,
-                0.20,
-                1
-            )
-
-        self.name_label.text = self.deadline.get(
-            "name",
-            ""
-        )
-
-        self.date_label.text = (
-            f"Date: {self.deadline.get('date', '')}"
-        )
+        return True
 
     def update_status(self):
 
         try:
-
-            deadline_date = datetime.strptime(
-                self.deadline["date"],
-                "%d/%m/%Y"
-            ).date()
-
+            deadline_date = date(
+                int(self.deadline["year"]),
+                int(self.deadline["month"]),
+                int(self.deadline["day"])
+            )
         except:
-
-            self.status_label.text = (
-                "Invalid date"
-            )
-
-            self.status_label.color = (
-                1,
-                0,
-                0,
-                1
-            )
-
             return
 
-        today = datetime.now().date()
+        today = date.today()
 
         difference = (
             deadline_date - today
         ).days
 
-        pinned_text = (
-            "\nPinned 📌"
-            if self.deadline.get(
-                "pinned",
-                False
-            )
-            else "\nNot pinned"
-        )
-
         if difference < 0:
 
-            days_ago = abs(
-                difference
-            )
+            days = abs(difference)
 
-            if days_ago == 1:
-                time_text = "1 day ago"
+            if days == 1:
+                message = (
+                    "OVERDUE\n"
+                    "Deadline finished 1 day ago."
+                )
             else:
-                time_text = (
-                    f"{days_ago} days ago"
+                message = (
+                    "OVERDUE\n"
+                    f"Deadline finished {days} days ago."
                 )
 
-            self.status_label.text = (
-                "OVERDUE\n"
-                f"Deadline finished {time_text}."
-                f"{pinned_text}"
-            )
-
+            self.status_label.text = message
             self.status_label.color = (
                 1,
-                0,
-                0,
+                0.25,
+                0.25,
                 1
             )
 
-        elif difference == 2:
+        elif difference == 0:
 
             self.status_label.text = (
-                "⚠ Deadline is near!\n"
-                "Days Remaining : 2"
-                f"{pinned_text}"
+                "⚠ Today is last date!\n"
+                + self.get_time_left()
             )
 
             self.status_label.color = (
                 1,
-                0.55,
-                0,
+                0.35,
+                0.35,
                 1
             )
 
@@ -493,28 +450,27 @@ class DeadlineCard(FloatLayout):
 
             self.status_label.text = (
                 "⚠ Deadline is tomorrow!\n"
-                "Days Remaining : 1"
-                f"{pinned_text}"
+                + self.get_time_left()
             )
 
             self.status_label.color = (
                 1,
-                0.55,
-                0,
+                0.75,
+                0.15,
                 1
             )
 
-        elif difference == 0:
+        elif difference == 2:
 
             self.status_label.text = (
-                "⚠ Today is last date!"
-                f"{pinned_text}"
+                "⚠ Deadline is near!\n"
+                + self.get_time_left()
             )
 
             self.status_label.color = (
                 1,
-                0,
-                0,
+                0.75,
+                0.15,
                 1
             )
 
@@ -522,49 +478,92 @@ class DeadlineCard(FloatLayout):
 
             self.status_label.text = (
                 "Deadline is not near.\n"
-                f"Days Remaining : {difference}"
-                f"{pinned_text}"
+                + self.get_time_left()
             )
 
             self.status_label.color = (
-                0,
-                1,
-                0,
+                0.75,
+                0.75,
+                0.75,
                 1
             )
+
+    def get_time_left(self):
+
+        try:
+            deadline_datetime = datetime(
+                int(self.deadline["year"]),
+                int(self.deadline["month"]),
+                int(self.deadline["day"]),
+                23,
+                59,
+                59
+            )
+
+            now = datetime.now()
+
+            difference = (
+                deadline_datetime - now
+            )
+
+            total_seconds = int(
+                difference.total_seconds()
+            )
+
+            if total_seconds <= 0:
+                return "Deadline time has passed."
+
+            days = total_seconds // 86400
+
+            remaining = total_seconds % 86400
+
+            hours = remaining // 3600
+
+            remaining %= 3600
+
+            minutes = remaining // 60
+
+            seconds = remaining % 60
+
+            return (
+                f"Time left : "
+                f"{days}d "
+                f"{hours}h "
+                f"{minutes} mins "
+                f"{seconds}s"
+            )
+
+        except:
+            return ""
 
 
 class DeadlineManager(App):
 
     def __init__(self, **kwargs):
-
         super().__init__(**kwargs)
 
         self.deadlines = []
-
-        self.cards = {}
-
-        self.alerted_tomorrow = set()
-
-        self.alerted_today = set()
-
-        self.last_search = ""
-
-        self.add_form_visible = False
-
-    def build(self):
+        self.cards = []
 
         self.load_deadlines()
 
-        if os.path.exists(
-            ICON_PATH
-        ):
+    def build(self):
 
-            self.icon = ICON_PATH
+        Window.bind(
+            on_key_down=self.on_key_down
+        )
 
         self.main_layout = FloatLayout()
 
-        self.build_interface()
+        self.page = FloatLayout(
+            size_hint=(1, 1)
+        )
+
+        self.main_layout.add_widget(
+            self.page
+        )
+
+        self.create_main_page()
 
         Clock.schedule_interval(
             self.update_countdowns,
@@ -575,129 +574,94 @@ class DeadlineManager(App):
 
     def load_deadlines(self):
 
-        if not os.path.exists(
-            SAVE_PATH
-        ):
-
-            self.deadlines = []
-
-            return
-
         try:
-
             with open(
-                SAVE_PATH,
+                DATA_PATH,
                 "r",
                 encoding="utf-8"
             ) as file:
 
                 data = json.load(file)
 
-            if isinstance(
-                data,
-                list
-            ):
+                if isinstance(data, list):
+                    self.deadlines = data
+                else:
+                    self.deadlines = []
 
-                self.deadlines = data
-
-            else:
-
-                self.deadlines = []
-
-        except:
-
+        except (
+            FileNotFoundError,
+            json.JSONDecodeError
+        ):
             self.deadlines = []
-
-        for deadline in self.deadlines:
-
-            if "pinned" not in deadline:
-
-                deadline["pinned"] = False
 
     def save_deadlines(self):
 
-        try:
+        with open(
+            DATA_PATH,
+            "w",
+            encoding="utf-8"
+        ) as file:
 
-            with open(
-                SAVE_PATH,
-                "w",
-                encoding="utf-8"
-            ) as file:
+            json.dump(
+                self.deadlines,
+                file,
+                indent=4
+            )
 
-                json.dump(
-                    self.deadlines,
-                    file,
-                    indent=4,
-                    ensure_ascii=False
-                )
+    def create_main_page(self):
 
-        except:
+        self.page.clear_widgets()
 
-            pass
-
-    def build_interface(self):
-
-        self.main_layout.clear_widgets()
-
-        root = FloatLayout()
-
-        self.main_layout.add_widget(
-            root
+        root = BoxLayout(
+            orientation="vertical",
+            spacing=dp(12),
+            padding=[
+                dp(30),
+                dp(20),
+                dp(30),
+                dp(20)
+            ]
         )
 
         title = Label(
-            text="DEADLINE MANAGER",
-            font_size=dp(30),
+            text="LIFE SYSTEM MANAGER",
+            font_size=dp(28),
             bold=True,
             color=(1, 1, 1, 1),
-            size_hint=(1, None),
-            height=dp(55),
-            pos_hint={
-                "x": 0,
-                "top": 0.98
-            }
+            size_hint_y=None,
+            height=dp(45)
         )
 
-        root.add_widget(
-            title
-        )
+        root.add_widget(title)
 
-        self.search_entry = TextInput(
+        self.search = TextInput(
             hint_text="Search deadlines...",
             multiline=False,
-            font_size=dp(15),
-            foreground_color=(1, 1, 1, 1),
-            hint_text_color=(0.55, 0.55, 0.55, 1),
-            background_color=(0.09, 0.09, 0.09, 1),
-            cursor_color=(1, 1, 1, 1),
+            size_hint_y=None,
+            height=dp(42),
             padding=[
                 dp(12),
                 dp(10)
             ],
-            size_hint=(None, None),
-            width=dp(400),
-            height=dp(45),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.88
-            }
+            background_normal="",
+            background_color=(0.08, 0.08, 0.08, 1),
+            foreground_color=(1, 1, 1, 1),
+            cursor_color=(1, 1, 1, 1)
         )
 
-        self.search_entry.bind(
-            text=self.search_changed
+        self.search.bind(
+            text=self.search_deadlines
         )
 
-        root.add_widget(
-            self.search_entry
-        )
+        root.add_widget(self.search)
 
         counter_box = FloatLayout(
-            size_hint=(None, None),
-            width=dp(500),
+            size_hint_y=None,
             height=dp(100),
+            size_hint_x=None,
+            width=dp(500),
             pos_hint={
-                "center_x": 0.5,
-                "top": 0.77
+                "center_x": 0.5
             }
         )
 
@@ -714,7 +678,10 @@ class DeadlineManager(App):
         )
 
         self.counter_label = Label(
-            text="",
+            text=(
+                f"TOTAL DEADLINES: "
+                f"{len(self.deadlines)}"
+            ),
             font_size=dp(20),
             bold=True,
             color=(1, 1, 1, 1),
@@ -744,502 +711,97 @@ class DeadlineManager(App):
             counter_box
         )
 
-        self.form_area = FloatLayout(
-            size_hint=(1, None),
-            height=dp(210),
-            pos_hint={
-                "x": 0,
-                "top": 0.61
-            }
-        )
-
-        root.add_widget(
-            self.form_area
-        )
-
-        self.add_button = Button(
+        add_button = Button(
             text="ADD DEADLINE",
-            font_size=dp(14),
-            bold=True,
-            color=(1, 1, 1, 1),
-            size_hint=(None, None),
-            width=dp(230),
-            height=dp(50),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.95
-            },
+            font_size=dp(17),
+            size_hint_y=None,
+            height=dp(48),
             background_normal="",
             background_color=(
-                0.13,
-                0.13,
-                0.13,
+                0.10,
+                0.10,
+                0.10,
                 1
-            )
+            ),
+            color=(1, 1, 1, 1)
         )
 
-        self.add_button.bind(
-            on_release=self.show_add_form
+        add_button.bind(
+            on_release=self.show_add_page
         )
 
-        self.form_area.add_widget(
-            self.add_button
-        )
+        root.add_widget(add_button)
 
-        self.create_form_widgets()
-
-        self.your_deadlines = Label(
+        your_deadlines = Label(
             text="YOUR DEADLINES",
-            font_size=dp(20),
+            font_size=dp(22),
             bold=True,
             color=(1, 1, 1, 1),
-            size_hint=(1, None),
-            height=dp(40),
-            pos_hint={
-                "x": 0,
-                "top": 0.48
-            }
+            size_hint_y=None,
+            height=dp(40)
         )
 
         root.add_widget(
-            self.your_deadlines
+            your_deadlines
         )
 
-        self.scroll_view = ScrollView(
+        self.scroll = ScrollView(
             do_scroll_x=False,
-            do_scroll_y=True,
-            bar_width=dp(8),
-            size_hint=(None, None),
-            width=dp(820),
-            height=dp(220),
-            pos_hint={
-                "center_x": 0.5,
-                "y": 0.03
-            }
+            do_scroll_y=True
         )
 
         self.deadline_layout = BoxLayout(
             orientation="vertical",
-            spacing=dp(8),
+            spacing=dp(12),
             padding=[
-                dp(10),
+                0,
                 dp(5),
-                dp(10),
-                dp(5)
+                0,
+                dp(20)
             ],
             size_hint_y=None
         )
 
         self.deadline_layout.bind(
-            minimum_height=self.deadline_layout.setter(
+            minimum_height=
+            self.deadline_layout.setter(
                 "height"
             )
         )
 
-        self.scroll_view.add_widget(
+        self.scroll.add_widget(
             self.deadline_layout
         )
 
         root.add_widget(
-            self.scroll_view
+            self.scroll
         )
 
-        self.refresh_deadlines(
-            preserve_cards=False
-        )
+        self.page.add_widget(root)
 
-    def create_form_widgets(self):
+        self.refresh_deadlines()
 
-        self.name_input = TextInput(
-            hint_text="Deadline Name",
-            multiline=False,
-            font_size=dp(14),
-            foreground_color=(1, 1, 1, 1),
-            hint_text_color=(0.55, 0.55, 0.55, 1),
-            background_color=(0.09, 0.09, 0.09, 1),
-            padding=[
-                dp(10),
-                dp(8)
-            ],
-            size_hint=(None, None),
-            width=dp(350),
-            height=dp(40),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.95
-            }
-        )
+    def refresh_deadlines(self, *args):
 
-        self.day_input = TextInput(
-            hint_text="Day",
-            multiline=False,
-            input_filter="int",
-            font_size=dp(14),
-            foreground_color=(1, 1, 1, 1),
-            hint_text_color=(0.55, 0.55, 0.55, 1),
-            background_color=(0.09, 0.09, 0.09, 1),
-            padding=[
-                dp(10),
-                dp(8)
-            ],
-            size_hint=(None, None),
-            width=dp(100),
-            height=dp(40),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.75
-            }
-        )
-
-        self.month_input = TextInput(
-            hint_text="Month",
-            multiline=False,
-            input_filter="int",
-            font_size=dp(14),
-            foreground_color=(1, 1, 1, 1),
-            hint_text_color=(0.55, 0.55, 0.55, 1),
-            background_color=(0.09, 0.09, 0.09, 1),
-            padding=[
-                dp(10),
-                dp(8)
-            ],
-            size_hint=(None, None),
-            width=dp(100),
-            height=dp(40),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.55
-            }
-        )
-
-        self.year_input = TextInput(
-            hint_text="Year",
-            multiline=False,
-            input_filter="int",
-            font_size=dp(14),
-            foreground_color=(1, 1, 1, 1),
-            hint_text_color=(0.55, 0.55, 0.55, 1),
-            background_color=(0.09, 0.09, 0.09, 1),
-            padding=[
-                dp(10),
-                dp(8)
-            ],
-            size_hint=(None, None),
-            width=dp(100),
-            height=dp(40),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.35
-            }
-        )
-
-        self.result_label = Label(
-            text="",
-            font_size=dp(13),
-            color=(1, 1, 1, 1),
-            size_hint=(1, None),
-            height=dp(30),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.18
-            }
-        )
-
-        self.create_button = Button(
-            text="CREATE DEADLINE",
-            font_size=dp(13),
-            bold=True,
-            color=(1, 1, 1, 1),
-            size_hint=(None, None),
-            width=dp(220),
-            height=dp(42),
-            pos_hint={
-                "center_x": 0.5,
-                "top": 0.03
-            },
-            background_normal="",
-            background_color=(
-                0.20,
-                0.20,
-                0.20,
-                1
-            )
-        )
-
-        self.create_button.bind(
-            on_release=self.add_deadline
-        )
-
-        self.back_button = Button(
-            text="BACK",
-            font_size=dp(13),
-            bold=True,
-            color=(1, 1, 1, 1),
-            size_hint=(None, None),
-            width=dp(150),
-            height=dp(42),
-            pos_hint={
-                "center_x": 0.5,
-                "top": -0.10
-            },
-            background_normal="",
-            background_color=(
-                0.13,
-                0.13,
-                0.13,
-                1
-            )
-        )
-
-        self.back_button.bind(
-            on_release=self.hide_add_form
-        )
-
-        self.form_widgets = [
-            self.name_input,
-            self.day_input,
-            self.month_input,
-            self.year_input,
-            self.result_label,
-            self.create_button,
-            self.back_button
-        ]
-
-        for widget in self.form_widgets:
-
-            widget.opacity = 0
-            widget.disabled = True
-
-            self.form_area.add_widget(
-                widget
-            )
-
-    def show_add_form(self, instance=None):
-
-        self.add_form_visible = True
-
-        self.add_button.opacity = 0
-        self.add_button.disabled = True
-
-        for widget in self.form_widgets:
-
-            widget.opacity = 1
-            widget.disabled = False
-
-        self.name_input.focus = True
-
-    def hide_add_form(self, instance=None):
-
-        self.add_form_visible = False
-
-        self.add_button.opacity = 1
-        self.add_button.disabled = False
-
-        for widget in self.form_widgets:
-
-            widget.opacity = 0
-            widget.disabled = True
-
-        self.name_input.text = ""
-        self.day_input.text = ""
-        self.month_input.text = ""
-        self.year_input.text = ""
-
-        self.result_label.text = ""
-
-        self.name_input.focus = False
-
-    def add_deadline(self, instance=None):
-
-        name = self.name_input.text.strip()
-        day = self.day_input.text.strip()
-        month = self.month_input.text.strip()
-        year = self.year_input.text.strip()
-
-        if (
-            name == ""
-            or day == ""
-            or month == ""
-            or year == ""
+        if not hasattr(
+            self,
+            "deadline_layout"
         ):
-
-            self.result_label.text = (
-                "Please fill in all fields."
-            )
-
-            self.result_label.color = (
-                1,
-                0.55,
-                0,
-                1
-            )
-
             return
 
-        try:
+        search_text = ""
 
-            deadline_date = datetime(
-                int(year),
-                int(month),
-                int(day)
-            )
-
-        except:
-
-            self.result_label.text = (
-                "Please enter a valid date."
-            )
-
-            self.result_label.color = (
-                1,
-                0.55,
-                0,
-                1
-            )
-
-            return
-
-        if (
-            deadline_date.date()
-            < datetime.now().date()
+        if hasattr(
+            self,
+            "search"
         ):
-
-            self.result_label.text = (
-                "Please enter a valid date."
+            search_text = (
+                self.search.text
+                .strip()
+                .casefold()
             )
 
-            self.result_label.color = (
-                1,
-                0.55,
-                0,
-                1
-            )
-
-            return
-
-        formatted_date = (
-            deadline_date.strftime(
-                "%d/%m/%Y"
-            )
-        )
-
-        for existing in self.deadlines:
-
-            if (
-                existing.get(
-                    "name",
-                    ""
-                ).casefold()
-                == name.casefold()
-                and existing.get(
-                    "date",
-                    ""
-                )
-                == formatted_date
-            ):
-
-                self.result_label.text = (
-                    "You have already created "
-                    "this deadline."
-                )
-
-                self.result_label.color = (
-                    1,
-                    0,
-                    0,
-                    1
-                )
-
-                return
-
-        self.deadlines.append(
-            {
-                "name": name,
-                "date": formatted_date,
-                "pinned": False
-            }
-        )
-
-        self.save_deadlines()
-
-        self.refresh_deadlines(
-            preserve_cards=False
-        )
-
-        self.hide_add_form()
-
-    def pinned_deadlines(self):
-
-        for deadline in self.deadlines:
-
-            if "pinned" not in deadline:
-
-                deadline["pinned"] = False
-
-        self.deadlines.sort(
-            key=lambda deadline:
-            deadline.get(
-                "pinned",
-                False
-            ),
-            reverse=True
-        )
-
-    def toggle_pin(self, deadline):
-
-        deadline["pinned"] = not deadline.get(
-            "pinned",
-            False
-        )
-
-        self.save_deadlines()
-
-        self.refresh_deadlines(
-            preserve_cards=False
-        )
-
-    def delete_deadline(self, deadline):
-
-        if deadline in self.deadlines:
-
-            self.deadlines.remove(
-                deadline
-            )
-
-        self.save_deadlines()
-
-        self.refresh_deadlines(
-            preserve_cards=False
-        )
-
-    def search_changed(self, instance, value):
-
-        value = value.casefold()
-
-        if value == self.last_search:
-            return
-
-        self.last_search = value
-
-        self.refresh_deadlines(
-            preserve_cards=False
-        )
-
-    def refresh_deadlines(
-        self,
-        preserve_cards=True
-    ):
-
-        self.pinned_deadlines()
-
-        search_text = (
-            self.search_entry.text.strip().casefold()
-        )
-
-        if search_text == "":
-            search_text = ""
-
-        visible_deadlines = []
+        filtered = []
 
         for deadline in self.deadlines:
 
@@ -1248,161 +810,163 @@ class DeadlineManager(App):
                 ""
             )
 
-            deadline_date = deadline.get(
-                "date",
-                ""
-            )
-
             if (
-                search_text not in name.casefold()
-                and search_text not in deadline_date.casefold()
+                not search_text
+                or search_text in name.casefold()
             ):
-                continue
-
-            visible_deadlines.append(
-                deadline
-            )
-
-        if not preserve_cards:
-
-            self.deadline_layout.clear_widgets()
-
-            self.cards.clear()
-
-            for deadline in visible_deadlines:
-
-                card = DeadlineCard(
-                    self,
+                filtered.append(
                     deadline
                 )
 
-                self.cards[id(deadline)] = card
-
-                self.deadline_layout.add_widget(
-                    card
-                )
-
-        else:
-
-            for deadline in visible_deadlines:
-
-                card = self.cards.get(
-                    id(deadline)
-                )
-
-                if card is not None:
-
-                    card.update_status()
-                    card.refresh_visuals()
-
-        self.counter_label.text = (
-            f"TOTAL DEADLINES: "
-            f"{len(self.deadlines)}"
+        filtered.sort(
+            key=lambda item:
+            not item.get(
+                "pinned",
+                False
+            )
         )
 
-    def update_countdowns(self, dt):
+        self.deadline_layout.clear_widgets()
 
-        self.check_deadline_alerts()
+        self.cards = []
 
-        for deadline in self.deadlines:
+        for deadline in filtered:
 
-            card = self.cards.get(
-                id(deadline)
+            card = DeadlineCard(
+                self,
+                deadline
             )
 
-            if card is not None:
+            self.cards.append(card)
+
+            self.deadline_layout.add_widget(
+                card
+            )
+
+        if hasattr(
+            self,
+            "counter_label"
+        ):
+
+            self.counter_label.text = (
+                f"TOTAL DEADLINES: "
+                f"{len(self.deadlines)}"
+            )
+
+    def search_deadlines(self, *args):
+
+        self.refresh_deadlines()
+
+    def update_countdowns(self, *args):
+
+        for card in self.cards:
+
+            if card.parent:
 
                 card.update_status()
 
-                card.refresh_visuals()
+        self.check_alerts()
 
-    def check_deadline_alerts(self):
+    def check_alerts(self):
 
-        today = datetime.now().date()
+        today = date.today()
 
         for deadline in self.deadlines:
 
             try:
 
-                deadline_date = datetime.strptime(
-                    deadline["date"],
-                    "%d/%m/%Y"
-                ).date()
+                deadline_date = date(
+                    int(deadline["year"]),
+                    int(deadline["month"]),
+                    int(deadline["day"])
+                )
 
             except:
-
                 continue
 
             difference = (
                 deadline_date - today
             ).days
 
-            identifier = (
-                f"{deadline.get('name', '')}"
-                f"|{deadline.get('date', '')}"
+            name = deadline.get(
+                "name",
+                "Deadline"
+            )
+
+            alert_key = (
+                f"{name}_"
+                f"{deadline['day']}_"
+                f"{deadline['month']}_"
+                f"{deadline['year']}"
             )
 
             if difference == 1:
 
-                if identifier not in self.alerted_tomorrow:
+                if deadline.get(
+                    "tomorrow_alert_sent",
+                    False
+                ):
+                    continue
 
-                    self.play_sound()
+                self.play_alarm()
 
-                    self.send_notification(
-                        "Hello from Life System Manager",
-                        (
-                            "The deadline "
-                            f"({deadline.get('name', '')}) "
-                            "is scheduled to conclude "
-                            "tomorrow."
-                        )
-                    )
+                self.send_notification(
+                    "Life System Manager",
+                    "Hello from Life System Manager. "
+                    f"The deadline ({name}) "
+                    "is scheduled to conclude tomorrow."
+                )
 
-                    self.alerted_tomorrow.add(
-                        identifier
-                    )
+                deadline[
+                    "tomorrow_alert_sent"
+                ] = True
+
+                self.save_deadlines()
 
             elif difference == 0:
 
-                if identifier not in self.alerted_today:
+                if deadline.get(
+                    "today_alert_sent",
+                    False
+                ):
+                    continue
 
-                    self.send_notification(
-                        "Hello from Life System Manager",
-                        (
-                            "The deadline "
-                            f"({deadline.get('name', '')}) "
-                            "is due today. "
-                            "We hope you have completed "
-                            "the deadline."
-                        )
-                    )
+                self.play_alarm()
 
-                    self.alerted_today.add(
-                        identifier
-                    )
+                self.send_notification(
+                    "Life System Manager",
+                    "Hello from Life System Manager. "
+                    f"The deadline ({name}) "
+                    "is due today. "
+                    "We hope you have completed "
+                    "the deadline."
+                )
 
-    def play_sound(self):
+                deadline[
+                    "today_alert_sent"
+                ] = True
 
-        if not os.path.exists(
-            SOUND_PATH
-        ):
+                self.save_deadlines()
 
-            return
+    def play_alarm(self):
 
         try:
 
-            if not pygame.mixer.get_init():
+            sound_path = resource_path(
+                "Alarm Sound Effect.mp3"
+            )
+
+            if os.path.exists(sound_path):
 
                 pygame.mixer.init()
 
-            pygame.mixer.music.load(
-                SOUND_PATH
-            )
+                pygame.mixer.music.load(
+                    sound_path
+                )
 
-            pygame.mixer.music.play()
+                pygame.mixer.music.play()
 
         except:
-
             pass
 
     def send_notification(
@@ -1412,7 +976,6 @@ class DeadlineManager(App):
     ):
 
         if notification is None:
-
             return
 
         try:
@@ -1425,10 +988,295 @@ class DeadlineManager(App):
             )
 
         except:
+            pass
 
+    def show_add_page(self, instance):
+
+        self.page.clear_widgets()
+
+        layout = BoxLayout(
+            orientation="vertical",
+            spacing=dp(15),
+            padding=[
+                dp(100),
+                dp(40),
+                dp(100),
+                dp(40)
+            ]
+        )
+
+        title = Label(
+            text="ADD DEADLINE",
+            font_size=dp(30),
+            bold=True,
+            color=(1, 1, 1, 1),
+            size_hint_y=None,
+            height=dp(60)
+        )
+
+        layout.add_widget(title)
+
+        self.name_input = TextInput(
+            hint_text="Deadline Name",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(45),
+            background_normal="",
+            background_color=(0.08, 0.08, 0.08, 1),
+            foreground_color=(1, 1, 1, 1)
+        )
+
+        layout.add_widget(
+            self.name_input
+        )
+
+        date_box = BoxLayout(
+            spacing=dp(10),
+            size_hint_y=None,
+            height=dp(45)
+        )
+
+        self.day_input = TextInput(
+            hint_text="Day",
+            multiline=False,
+            input_filter="int",
+            background_normal="",
+            background_color=(0.08, 0.08, 0.08, 1),
+            foreground_color=(1, 1, 1, 1)
+        )
+
+        self.month_input = TextInput(
+            hint_text="Month",
+            multiline=False,
+            input_filter="int",
+            background_normal="",
+            background_color=(0.08, 0.08, 0.08, 1),
+            foreground_color=(1, 1, 1, 1)
+        )
+
+        self.year_input = TextInput(
+            hint_text="Year",
+            multiline=False,
+            input_filter="int",
+            background_normal="",
+            background_color=(0.08, 0.08, 0.08, 1),
+            foreground_color=(1, 1, 1, 1)
+        )
+
+        date_box.add_widget(
+            self.day_input
+        )
+
+        date_box.add_widget(
+            self.month_input
+        )
+
+        date_box.add_widget(
+            self.year_input
+        )
+
+        layout.add_widget(date_box)
+
+        self.error_label = Label(
+            text="",
+            color=(1, 0.25, 0.25, 1),
+            font_size=dp(15),
+            size_hint_y=None,
+            height=dp(45)
+        )
+
+        layout.add_widget(
+            self.error_label
+        )
+
+        add_button = Button(
+            text="CREATE DEADLINE",
+            font_size=dp(17),
+            size_hint_y=None,
+            height=dp(50),
+            background_normal="",
+            background_color=(
+                0.10,
+                0.10,
+                0.10,
+                1
+            )
+        )
+
+        add_button.bind(
+            on_release=self.add_deadline
+        )
+
+        layout.add_widget(
+            add_button
+        )
+
+        back_button = Button(
+            text="GO BACK",
+            font_size=dp(16),
+            size_hint_y=None,
+            height=dp(45),
+            background_normal="",
+            background_color=(
+                0.07,
+                0.07,
+                0.07,
+                1
+            )
+        )
+
+        back_button.bind(
+            on_release=self.create_main_page
+        )
+
+        layout.add_widget(
+            back_button
+        )
+
+        self.page.add_widget(
+            layout
+        )
+
+    def add_deadline(self, instance):
+
+        name = self.name_input.text.strip()
+
+        day_text = self.day_input.text.strip()
+        month_text = self.month_input.text.strip()
+        year_text = self.year_input.text.strip()
+
+        if not name:
+
+            self.error_label.text = (
+                "Please enter a deadline name."
+            )
+
+            return
+
+        if (
+            not day_text
+            or not month_text
+            or not year_text
+        ):
+
+            self.error_label.text = (
+                "Please enter a complete date."
+            )
+
+            return
+
+        try:
+
+            day = int(day_text)
+            month = int(month_text)
+            year = int(year_text)
+
+            deadline_date = date(
+                year,
+                month,
+                day
+            )
+
+        except:
+
+            self.error_label.text = (
+                "Please enter a valid date."
+            )
+
+            return
+
+        if deadline_date < date.today():
+
+            self.error_label.text = (
+                "Please enter a valid date."
+            )
+
+            return
+
+        for deadline in self.deadlines:
+
+            same_name = (
+                deadline.get(
+                    "name",
+                    ""
+                ).casefold()
+                == name.casefold()
+            )
+
+            same_date = (
+                int(
+                    deadline.get(
+                        "day",
+                        0
+                    )
+                ) == day
+                and
+                int(
+                    deadline.get(
+                        "month",
+                        0
+                    )
+                ) == month
+                and
+                int(
+                    deadline.get(
+                        "year",
+                        0
+                    )
+                ) == year
+            )
+
+            if same_name and same_date:
+
+                self.error_label.text = (
+                    "You have already created "
+                    "this deadline."
+                )
+
+                return
+
+        new_deadline = {
+            "name": name,
+            "day": day,
+            "month": month,
+            "year": year,
+            "pinned": False,
+            "tomorrow_alert_sent": False,
+            "today_alert_sent": False
+        }
+
+        self.deadlines.append(
+            new_deadline
+        )
+
+        self.save_deadlines()
+
+        self.create_main_page()
+
+    def on_key_down(
+        self,
+        window,
+        key,
+        scancode,
+        codepoint,
+        modifiers
+    ):
+
+        if key == 27:
+
+            self.create_main_page()
+
+            return True
+
+        return False
+
+    def on_stop(self):
+
+        try:
+            pygame.mixer.quit()
+        except:
             pass
 
 
 if __name__ == "__main__":
-
     DeadlineManager().run()
