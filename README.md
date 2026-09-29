@@ -1,8 +1,8 @@
-##Deadline Manager
+## Deadline Manager
 This app is for creating deadlines.
 It can be highly useful if you have multiples duties and may forget some of them.
 
-#Features
+# Features
 * **1.Time** : Shows the remaining time for finishing the deadline.
 * **2.Remainder** : When the deadline is going to finish tomorrow, we will send a notification to remind you about it.
 * **3.Pinned deadlines** : Important deadlines can be pinned if required.
