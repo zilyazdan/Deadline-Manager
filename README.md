@@ -1,4 +1,4 @@
-## Deadline Manager
+# Deadline Manager
 This app is for creating deadlines.
 It can be highly useful if you have multiples duties and may forget some of them.
 
