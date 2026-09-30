@@ -22,12 +22,4 @@ This project uses the following Python libraries and modules:
 * **datetime** — [Python Documentation](https://docs.python.org/3/library/datetime.html)
 * **Pygame** — [pygame.org](https://www.pygame.org/)
 
-## Installation
-
-Install the external packages with:
-
-```bash
-pip install kivy plyer pygame
-```
-
-`os`, `json`, and `datetime` are included with Python, so they do not need to be installed separately.
+These python libraries will be installed with the .exe file
