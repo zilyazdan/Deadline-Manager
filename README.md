@@ -22,4 +22,4 @@ This project uses the following Python libraries and modules:
 * **datetime** — [Python Documentation](https://docs.python.org/3/library/datetime.html)
 * **Pygame** — [pygame.org](https://www.pygame.org/)
 
-These python libraries will be installed with the .exe file
+These python libraries will be installed with the .exe file.
